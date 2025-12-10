@@ -38,3 +38,41 @@ class ModernizationResult:
             self.modernized_content is not None and
             self.original_content != self.modernized_content
         )
+
+"""
+Execution result models
+"""
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any
+
+
+@dataclass
+class StepResult:
+    """Result of a single execution step"""
+    success: bool
+    data: Optional[Any] = None
+    error: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def has_error(self) -> bool:
+        """Check if step has error"""
+        return self.error is not None
+
+
+@dataclass
+class ExecutionResult:
+    """Complete execution result"""
+    execution_id: Optional[str] = None
+    cloned_repo_path: Optional[str] = None
+    payload_file: Optional[str] = None
+    callback_file: Optional[str] = None
+    results_directory: Optional[str] = None
+    success: bool = False
+    error: Optional[str] = None
+
+    def add_step_result(self, step_name: str, result: StepResult) -> None:
+        """Add a step result to execution"""
+        if not result.success:
+            self.success = False
+            self.error = f"{step_name}: {result.error}"

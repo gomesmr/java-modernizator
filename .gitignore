@@ -35,8 +35,7 @@ wheels/
 /modernization_report.json
 
 # Assets
-/assets/main-payload.md
-
+/assets/*
 # OS
 .DS_Store
 Thumbs.db

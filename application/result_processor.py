@@ -3,62 +3,63 @@
 Result processor for StackSpot AI callback results
 """
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
 class AnalysisResult:
     """Structured analysis result"""
-    timestamp: str
-    repository: str
-    java_version: str
-    spring_boot_version: Optional[str]
-    frameworks: List[Dict]
-    outdated_dependencies: List[Dict]
-    legacy_patterns: List[Dict]
-    code_smells: List[Dict]
-    architecture_notes: Dict
-    summary: str
+    timestamp: str = ""
+    repository: str = ""
+    java_version: str = ""
+    spring_boot_version: Optional[str] = None
+    frameworks: List[Dict] = field(default_factory=list)
+    outdated_dependencies: List[Dict] = field(default_factory=list)
+    legacy_patterns: List[Dict] = field(default_factory=list)
+    code_smells: List[Dict] = field(default_factory=list)
+    architecture_notes: Dict = field(default_factory=dict)
+    summary: str = ""
 
 
 @dataclass
 class PlanResult:
     """Structured plan result"""
-    timestamp: str
-    strategy: str
-    estimated_duration: str
-    steps: List[Dict]
-    milestones: List[Dict]
-    risks: List[Dict]
-    recommendations: List[str]
+    timestamp: str = ""
+    strategy: str = ""
+    estimated_duration: str = ""
+    steps: List[Dict] = field(default_factory=list)
+    milestones: List[Dict] = field(default_factory=list)
+    risks: List[Dict] = field(default_factory=list)
+    recommendations: List[str] = field(default_factory=list)
 
 
 @dataclass
 class RefactorResult:
     """Structured refactor result"""
-    timestamp: str
-    step_id: str
-    status: str
-    changes: List[Dict]
-    issues: List[Dict]
-    compilation_status: str
-    tests_run: bool
-    next_step: str
+    timestamp: str = ""
+    step_id: str = ""
+    status: str = ""
+    changes: List[Dict] = field(default_factory=list)
+    issues: List[Dict] = field(default_factory=list)
+    compilation_status: str = ""
+    tests_run: bool = False
+    next_step: str = ""
 
 
 @dataclass
 class MetricsResult:
     """Structured metrics result"""
-    metadata: Dict
-    execution: Dict
-    agents_metrics: Dict
-    totals: Dict
-    modernization_impact: Dict
-    quality_metrics: Dict
-    versions: Dict
+    metadata: Dict = field(default_factory=dict)
+    execution: Dict = field(default_factory=dict)
+    agents_metrics: Dict = field(default_factory=dict)
+    totals: Dict = field(default_factory=dict)
+    modernization_impact: Dict = field(default_factory=dict)
+    quality_metrics: Dict = field(default_factory=dict)
+    versions: Dict = field(default_factory=dict)
 
 
 class StackSpotResultProcessor:
@@ -78,12 +79,20 @@ class StackSpotResultProcessor:
                 self.raw_result = json.load(f)
 
             print(f"✅ Callback result loaded successfully")
-            print(f"📊 Execution ID: {self.raw_result.get('execution_id')}")
-            print(f"🎯 Command: {self.raw_result.get('quick_command_slug')}")
-            print(f"⏱️ Status: {self.raw_result.get('progress', {}).get('status')}")
+            print(f"📊 Execution ID: {self.raw_result.get('execution_id', 'N/A')}")
+            print(f"🎯 Command: {self.raw_result.get('quick_command_slug', 'N/A')}")
+
+            progress = self.raw_result.get('progress', {})
+            print(f"⏱️ Status: {progress.get('status', 'N/A')}")
 
             return self.raw_result
 
+        except FileNotFoundError:
+            print(f"❌ File not found: {callback_file_path}")
+            return {}
+        except json.JSONDecodeError as e:
+            print(f"❌ Invalid JSON in file: {e}")
+            return {}
         except Exception as e:
             print(f"❌ Error loading callback result: {e}")
             return {}
@@ -91,42 +100,100 @@ class StackSpotResultProcessor:
     def extract_step_results(self) -> Dict[str, Any]:
         """Extract results from each step"""
         if not self.raw_result:
+            print("⚠️ No raw result available")
             return {}
 
         steps = self.raw_result.get('steps', [])
+        if not steps:
+            print("⚠️ No steps found in result")
+            return {}
+
         extracted = {}
 
         for step in steps:
-            step_name = step.get('step_name')
+            step_name = step.get('step_name', '')
             step_result = step.get('step_result', {})
             answer = step_result.get('answer', '')
 
-            if step_name == 'step-analyze':
-                extracted['analysis'] = self._parse_json_answer(answer)
-            elif step_name == 'step-plan':
-                extracted['plan'] = self._parse_json_answer(answer)
-            elif step_name == 'step-refactor':
-                extracted['refactor'] = self._parse_json_answer(answer)
-            elif step_name == 'step-metrics':
-                extracted['metrics'] = self._parse_json_answer(answer)
+            if not answer:
+                print(f"⚠️ No answer found for step: {step_name}")
+                continue
+
+            # Map step names to result keys
+            step_mapping = {
+                'step-analyze': 'analysis',
+                'step-plan': 'plan',
+                'step-refactor': 'refactor',
+                'step-metrics': 'metrics'
+            }
+
+            result_key = step_mapping.get(step_name)
+            if result_key:
+                parsed_data = self._parse_json_answer(answer)
+                if parsed_data:
+                    extracted[result_key] = parsed_data
+                    print(f"✅ Extracted {result_key} data")
+                else:
+                    print(f"⚠️ Failed to parse {result_key} data")
 
         return extracted
 
     def _parse_json_answer(self, answer: str) -> Dict:
-        """Parse JSON from step answer"""
-        try:
-            # Remove markdown code blocks if present
-            if '```json' in answer:
-                start = answer.find('```json') + 7
-                end = answer.find('```', start)
-                json_str = answer[start:end].strip()
-            else:
-                json_str = answer.strip()
-
-            return json.loads(json_str)
-        except Exception as e:
-            print(f"⚠️ Error parsing JSON answer: {e}")
+        """Parse JSON from step answer with multiple strategies"""
+        if not answer or not isinstance(answer, str):
             return {}
+
+        # Strategy 1: Try direct JSON parse
+        try:
+            return json.loads(answer.strip())
+        except json.JSONDecodeError:
+            pass
+
+        # Strategy 2: Extract from markdown code blocks
+        try:
+            # Match ```json ... ``` or ``` ... ```
+            patterns = [
+                r'```json\s*\n(.*?)\n```',
+                r'```\s*\n(.*?)\n```',
+                r'```json(.*?)```',
+                r'```(.*?)```'
+            ]
+
+            for pattern in patterns:
+                match = re.search(pattern, answer, re.DOTALL)
+                if match:
+                    json_str = match.group(1).strip()
+                    return json.loads(json_str)
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+        # Strategy 3: Try to find JSON object/array in text
+        try:
+            # Find first { or [ and last } or ]
+            start_brace = answer.find('{')
+            start_bracket = answer.find('[')
+
+            # Determine which comes first
+            if start_brace == -1:
+                start = start_bracket
+                end_char = ']'
+            elif start_bracket == -1:
+                start = start_brace
+                end_char = '}'
+            else:
+                start = min(start_brace, start_bracket)
+                end_char = '}' if start == start_brace else ']'
+
+            if start != -1:
+                end = answer.rfind(end_char)
+                if end != -1:
+                    json_str = answer[start:end + 1]
+                    return json.loads(json_str)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        print(f"⚠️ Could not parse JSON from answer (length: {len(answer)})")
+        return {}
 
     def process_analysis(self, analysis_data: Dict) -> AnalysisResult:
         """Process analysis step result"""
@@ -180,8 +247,34 @@ class StackSpotResultProcessor:
             versions=metrics_data.get('versions', {})
         )
 
+    def _safe_get(self, data: Dict, *keys, default='N/A'):
+        """Safely get nested dictionary values"""
+        for key in keys:
+            if isinstance(data, dict):
+                data = data.get(key, {})
+            else:
+                return default
+        return data if data else default
+
+    def _format_duration(self, seconds: Any) -> str:
+        """Format duration in seconds to human readable"""
+        try:
+            seconds = int(seconds)
+            if seconds < 60:
+                return f"{seconds}s"
+            elif seconds < 3600:
+                minutes = seconds // 60
+                secs = seconds % 60
+                return f"{minutes}m {secs}s"
+            else:
+                hours = seconds // 3600
+                minutes = (seconds % 3600) // 60
+                return f"{hours}h {minutes}m"
+        except (ValueError, TypeError):
+            return str(seconds)
+
     def generate_summary_report(self) -> str:
-        """Generate a comprehensive summary report"""
+        """Generate a comprehensive summary report with proper Markdown formatting"""
         if not self.raw_result:
             return "❌ No callback result loaded"
 
@@ -203,101 +296,205 @@ class StackSpotResultProcessor:
         if 'metrics' in step_results:
             metrics = self.process_metrics(step_results['metrics'])
 
-        # Generate report
-        report = []
-        report.append("🎵 MODERN JAZZ - ANÁLISE COMPLETA")
-        report.append("=" * 60)
+        # Generate report with proper Markdown formatting
+        lines = []
+
+        # Header
+        lines.extend([
+            "# 🎵 MODERN JAZZ - ANÁLISE COMPLETA",
+            "",
+            "=" * 60,
+            ""
+        ])
 
         # Execution info
         progress = self.raw_result.get('progress', {})
-        report.append(f"\n📊 INFORMAÇÕES DA EXECUÇÃO")
-        report.append(f"🔗 Execution ID: {self.raw_result.get('execution_id')}")
-        report.append(f"🎯 Command: {self.raw_result.get('quick_command_slug')}")
-        report.append(f"⏱️ Status: {progress.get('status')}")
-        report.append(f"🕐 Duração: {progress.get('duration')} segundos")
-        report.append(f"📅 Início: {progress.get('start')}")
-        report.append(f"🏁 Fim: {progress.get('end')}")
+        lines.extend([
+            "## 📊 INFORMAÇÕES DA EXECUÇÃO",
+            "",
+            f"🔗 **Execution ID:** `{self.raw_result.get('execution_id', 'N/A')}`",
+            "",
+            f"🎯 **Command:** `{self.raw_result.get('quick_command_slug', 'N/A')}`",
+            "",
+            f"⏱️ **Status:** {progress.get('status', 'N/A')}",
+            "",
+            f"🕐 **Duração:** {self._format_duration(progress.get('duration', 0))}",
+            "",
+            f"📅 **Início:** {progress.get('start', 'N/A')}",
+            "",
+            f"🏁 **Fim:** {progress.get('end', 'N/A')}",
+            ""
+        ])
 
         # Analysis summary
         if analysis:
-            report.append(f"\n🔍 ANÁLISE DO PROJETO")
-            report.append(f"📁 Repositório: {analysis.repository}")
-            report.append(f"☕ Java Version: {analysis.java_version}")
-            report.append(f"🌱 Spring Boot: {analysis.spring_boot_version or 'Não detectado'}")
+            lines.extend([
+                "## 🔍 ANÁLISE DO PROJETO",
+                "",
+                f"📁 **Repositório:** {analysis.repository}",
+                "",
+                f"☕ **Java Version:** {analysis.java_version}",
+                "",
+                f"🌱 **Spring Boot:** {analysis.spring_boot_version or 'Não detectado'}",
+                ""
+            ])
 
-            report.append(f"\n📚 FRAMEWORKS DESATUALIZADOS ({len(analysis.frameworks)}):")
-            for fw in analysis.frameworks:
-                status = "❌" if fw.get('isOutdated') else "✅"
-                report.append(
-                    f"  {status} {fw.get('name')}: {fw.get('currentVersion')} → {fw.get('latestStableVersion')}")
+            # Frameworks
+            if analysis.frameworks:
+                lines.extend([
+                    f"### 📚 FRAMEWORKS DESATUALIZADOS ({len(analysis.frameworks)}):",
+                    ""
+                ])
+                for fw in analysis.frameworks:
+                    is_outdated = fw.get('isOutdated', False)
+                    status = "❌" if is_outdated else "✅"
+                    current = fw.get('currentVersion', 'N/A')
+                    latest = fw.get('latestStableVersion', 'N/A')
+                    lines.append(f"- {status} **{fw.get('name', 'Unknown')}:** {current} → {latest}")
+                lines.append("")
 
-            report.append(f"\n⚠️ PADRÕES LEGADOS ({len(analysis.legacy_patterns)}):")
-            for pattern in analysis.legacy_patterns:
-                severity_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(pattern.get('severity'), "⚪")
-                report.append(f"  {severity_icon} {pattern.get('type')} - {pattern.get('location')}")
+            # Legacy patterns
+            if analysis.legacy_patterns:
+                lines.extend([
+                    f"### ⚠️ PADRÕES LEGADOS ({len(analysis.legacy_patterns)}):",
+                    ""
+                ])
+                for pattern in analysis.legacy_patterns:
+                    severity = pattern.get('severity', 'medium')
+                    severity_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(severity, "⚪")
+                    pattern_type = pattern.get('type', 'Unknown')
+                    location = pattern.get('location', 'N/A')
+                    lines.append(f"- {severity_icon} **{pattern_type}** - `{location}`")
+                lines.append("")
 
-            report.append(f"\n🦨 CODE SMELLS ({len(analysis.code_smells)}):")
-            for smell in analysis.code_smells:
-                severity_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(smell.get('severity'), "⚪")
-                report.append(f"  {severity_icon} {smell.get('type')} - {smell.get('location')}")
+            # Code smells
+            if analysis.code_smells:
+                lines.extend([
+                    f"### 🦨 CODE SMELLS ({len(analysis.code_smells)}):",
+                    ""
+                ])
+                for smell in analysis.code_smells:
+                    severity = smell.get('severity', 'low')
+                    severity_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(severity, "⚪")
+                    smell_type = smell.get('type', 'Unknown')
+                    location = smell.get('location', 'N/A')
+                    lines.append(f"- {severity_icon} **{smell_type}** - `{location}`")
+                lines.append("")
 
         # Plan summary
         if plan:
-            report.append(f"\n📋 PLANO DE MODERNIZAÇÃO")
-            report.append(f"🎯 Estratégia: {plan.strategy}")
-            report.append(f"⏱️ Duração Estimada: {plan.estimated_duration}")
-            report.append(f"📝 Total de Steps: {len(plan.steps)}")
+            lines.extend([
+                "## 📋 PLANO DE MODERNIZAÇÃO",
+                "",
+                f"🎯 **Estratégia:** {plan.strategy}",
+                "",
+                f"⏱️ **Duração Estimada:** {plan.estimated_duration}",
+                "",
+                f"📝 **Total de Steps:** {len(plan.steps)}",
+                ""
+            ])
 
-            report.append(f"\n🎯 MILESTONES:")
-            for milestone in plan.milestones:
-                report.append(f"  📍 {milestone.get('name')}")
-                report.append(f"     Steps: {', '.join(milestone.get('completedSteps', []))}")
+            # Milestones
+            if plan.milestones:
+                lines.extend([
+                    "### 🎯 MILESTONES:",
+                    ""
+                ])
+                for milestone in plan.milestones:
+                    name = milestone.get('name', 'Unknown')
+                    description = milestone.get('description', '')
+                    steps = milestone.get('steps', [])
+                    lines.extend([
+                        f"- 📍 **[{name}]** {description}",
+                        f"  - Steps: {', '.join(steps) if steps else 'N/A'}",
+                        ""
+                    ])
 
         # Refactor summary
         if refactor:
-            report.append(f"\n🔧 REFATORAÇÃO EXECUTADA")
-            report.append(f"📝 Step ID: {refactor.step_id}")
-            report.append(f"✅ Status: {refactor.status}")
-            report.append(f"🔨 Compilação: {refactor.compilation_status}")
-            report.append(f"🧪 Testes Executados: {'Sim' if refactor.tests_run else 'Não'}")
+            lines.extend([
+                "## 🔧 REFATORAÇÃO EXECUTADA",
+                "",
+                f"📝 **Step ID:** {refactor.step_id}",
+                "",
+                f"✅ **Status:** {refactor.status}",
+                "",
+                f"🔨 **Compilação:** {refactor.compilation_status}",
+                "",
+                f"🧪 **Testes Executados:** {'Sim' if refactor.tests_run else 'Não'}",
+                ""
+            ])
 
-            report.append(f"\n📁 ARQUIVOS MODIFICADOS ({len(refactor.changes)}):")
-            for change in refactor.changes:
-                report.append(f"  📝 {change.get('file')} - {change.get('description')}")
+            # Modified files
+            if refactor.changes:
+                lines.extend([
+                    f"### 📁 ARQUIVOS MODIFICADOS ({len(refactor.changes)}):",
+                    ""
+                ])
+                for change in refactor.changes:
+                    file_path = change.get('file', 'Unknown')
+                    description = change.get('description', 'No description')
+                    lines.append(f"- 📝 **{file_path}** - {description}")
+                lines.append("")
 
         # Metrics summary
         if metrics:
-            report.append(f"\n📊 MÉTRICAS E IMPACTO")
+            lines.extend([
+                "## 📊 MÉTRICAS E IMPACTO",
+                ""
+            ])
+
             totals = metrics.totals
             impact = metrics.modernization_impact
 
-            report.append(f"💰 Custo Total: ${totals.get('total_cost_usd', 0):.3f}")
-            report.append(f"🎯 Tokens Consumidos: {totals.get('total_tokens', 0):,}")
-            report.append(f"📁 Arquivos Modificados: {impact.get('files_modified', 0)}")
-            report.append(f"📦 Dependências Atualizadas: {impact.get('dependencies_updated', 0)}")
-            report.append(f"🦨 Code Smells Corrigidos: {impact.get('code_smells_fixed', 0)}")
+            lines.extend([
+                f"💰 **Custo Total:** ${totals.get('total_cost_usd', 0):.3f}",
+                "",
+                f"🎯 **Tokens Consumidos:** {totals.get('total_tokens', 0):,}",
+                "",
+                f"📁 **Arquivos Modificados:** {impact.get('files_modified', 0)}",
+                "",
+                f"📦 **Dependências Atualizadas:** {impact.get('dependencies_updated', 0)}",
+                "",
+                f"🦨 **Code Smells Corrigidos:** {impact.get('code_smells_fixed', 0)}",
+                ""
+            ])
 
+            # Version changes
             versions = metrics.versions
-            if 'before' in versions and 'after' in versions:
-                report.append(f"\n🔄 VERSÕES (ANTES → DEPOIS):")
+            if versions and 'before' in versions and 'after' in versions:
+                lines.extend([
+                    "### 🔄 VERSÕES (ANTES → DEPOIS):",
+                    ""
+                ])
                 before = versions['before']
                 after = versions['after']
                 for key in before:
-                    report.append(f"  📦 {key}: {before[key]} → {after.get(key, 'N/A')}")
+                    before_val = before.get(key, 'N/A')
+                    after_val = after.get(key, 'N/A')
+                    lines.append(f"- 📦 **{key}:** {before_val} → {after_val}")
+                lines.append("")
 
-        report.append(f"\n" + "=" * 60)
-        report.append(f"✅ Relatório gerado em {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        # Footer
+        lines.extend([
+            "",
+            "=" * 60,
+            "",
+            f"✅ **Relatório gerado em** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            ""
+        ])
 
-        return "\n".join(report)
+        return "\n".join(lines)
 
     def save_structured_results(self, output_dir: str) -> Dict[str, str]:
         """Save structured results to separate files"""
         output_path = Path(output_dir)
-        output_path.mkdir(exist_ok=True)
+        output_path.mkdir(parents=True, exist_ok=True)
 
         saved_files = {}
 
         if not self.raw_result:
+            print("⚠️ No raw result to save")
             return saved_files
 
         # Extract and save step results
@@ -306,15 +503,23 @@ class StackSpotResultProcessor:
         for step_name, data in step_results.items():
             if data:
                 file_path = output_path / f"{step_name}-result.json"
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                saved_files[step_name] = str(file_path)
+                try:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    saved_files[step_name] = str(file_path)
+                    print(f"✅ Saved {step_name} to {file_path}")
+                except Exception as e:
+                    print(f"❌ Failed to save {step_name}: {e}")
 
         # Save summary report
-        summary_report = self.generate_summary_report()
-        report_path = output_path / "modernization-report.md"
-        with open(report_path, 'w', encoding='utf-8') as f:
-            f.write(summary_report)
-        saved_files['report'] = str(report_path)
+        try:
+            summary_report = self.generate_summary_report()
+            report_path = output_path / "modernization-report.md"
+            with open(report_path, 'w', encoding='utf-8') as f:
+                f.write(summary_report)
+            saved_files['report'] = str(report_path)
+            print(f"✅ Saved report to {report_path}")
+        except Exception as e:
+            print(f"❌ Failed to save report: {e}")
 
         return saved_files
