@@ -24,6 +24,10 @@ class Settings:
     # Action Paths
     CLONE_ACTION_PATH = r"C:\Users\marcelo.gomes\gomesmr\Hackathon\clone-repository-action"
 
+    # File Collection Paths - NOVOS CAMINHOS
+    MAIN_PATHS_FILE = PROJECT_ROOT / "assets" / "main-paths.txt"
+    MAIN_PAYLOAD_FILE = PROJECT_ROOT / "assets" / "main-payload.md"
+
     # File System
     IGNORED_DIRECTORIES = {
         '.git', '.idea', '__pycache__', 'target', 'build',
@@ -52,5 +56,6 @@ settings = Settings()
 # Debug: Print settings when module is imported
 if __name__ == '__main__':
     print("🔍 Settings Debug:")
-    print(settings)
-    print(f"\n📁 Credentials file exists: {settings.CREDENTIALS_PATH.exists()}")
+    print(f"📁 Main paths file: {settings.MAIN_PATHS_FILE}")
+    print(f"📄 Main payload file: {settings.MAIN_PAYLOAD_FILE}")
+    print(f"📁 Credentials file exists: {settings.CREDENTIALS_PATH.exists()}")

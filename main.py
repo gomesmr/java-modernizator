@@ -10,6 +10,8 @@ from config.settings import settings
 from infrastructure.file_system import JavaFileRepository
 from infrastructure.stackspot_client import StackspotApiClient
 from infrastructure.stackspot_action_runner import StackspotActionRunner
+from infrastructure.file_collector import FileCollectorService
+
 
 def validate_setup() -> None:
     """Validate that all required files and directories exist"""
@@ -32,9 +34,17 @@ def validate_setup() -> None:
     except Exception as e:
         errors.append(f"❌ Error loading credentials: {e}")
 
+    # Validate main-paths.txt exists
+    if not settings.MAIN_PATHS_FILE.exists():
+        errors.append(
+            f"❌ Main paths file not found: {settings.MAIN_PATHS_FILE}\n"
+            f"   Create this file with the list of files to collect"
+        )
+
     if errors:
         print("\n" + "\n\n".join(errors))
         sys.exit(1)
+
 
 def run_clone_step() -> str:
     """
@@ -54,33 +64,74 @@ def run_clone_step() -> str:
         print(f"❌ Failed to clone repository: {e}")
         raise
 
-def run_modernization(java_project_path: str, save_changes: bool = True) -> dict:
+
+def run_file_collection(cloned_repo_path: str) -> str:
     """
-    Execute modernization process
+    Execute file collection step
 
     Args:
-        java_project_path: Path to Java project
-        save_changes: Whether to save changes
+        cloned_repo_path: Path to cloned repository
 
     Returns:
-        Statistics dictionary
+        Path to generated payload file
     """
-    print("\n" + "🔧 STEP 2: Modernizing Code".center(60, "="))
+    print("\n" + "📄 STEP 2: Collecting Files".center(60, "="))
 
-    # Initialize components
-    file_repository = JavaFileRepository(java_project_path)
-    api_client = StackspotApiClient(str(settings.CREDENTIALS_PATH))
-    service = ModernizationService(file_repository, api_client)
+    try:
+        file_collector = FileCollectorService()
+        payload_file = file_collector.generate_payload_file(
+            cloned_repo_path=cloned_repo_path,
+            paths_file_path=str(settings.MAIN_PATHS_FILE),
+            output_file_path=str(settings.MAIN_PAYLOAD_FILE)
+        )
+        return payload_file
 
-    # Execute modernization
-    stats = service.modernize_all_files(save_changes=save_changes)
+    except Exception as e:
+        print(f"❌ Failed to collect files: {e}")
+        raise
 
-    # Generate report
-    print("\n📝 Generating report...")
-    report_generator = ReportGenerator(service.get_results())
-    report_generator.generate_json_report(str(settings.REPORT_OUTPUT_PATH))
 
-    return stats
+def run_stackspot_processing(payload_file: str) -> dict:
+    """
+    Execute StackSpot processing step
+
+    Args:
+        payload_file: Path to payload file
+
+    Returns:
+        Processing results
+    """
+    print("\n" + "🤖 STEP 3: Processing with StackSpot AI".center(60, "="))
+
+    try:
+        # Read payload content
+        with open(payload_file, 'r', encoding='utf-8') as f:
+            payload_content = f.read()
+
+        # Initialize StackSpot client
+        api_client = StackspotApiClient(str(settings.CREDENTIALS_PATH))
+
+        # Execute quick command
+        print(f"🚀 Executing quick command: {settings.QUICK_COMMAND_SLUG}")
+        execution_id = api_client.execute_quick_command(
+            settings.QUICK_COMMAND_SLUG,
+            payload_content
+        )
+
+        # Poll for results
+        print(f"⏳ Polling for results...")
+        result = api_client.poll_execution_result(execution_id)
+
+        return {
+            'execution_id': execution_id,
+            'result': result,
+            'success': result is not None
+        }
+
+    except Exception as e:
+        print(f"❌ Failed to process with StackSpot: {e}")
+        raise
+
 
 def main():
     """Main execution function"""
@@ -91,27 +142,34 @@ def main():
     validate_setup()
 
     # Configuration
-    save_changes = True
     use_cloned_repo = True  # Set to False to skip cloning
 
     try:
         # Step 1: Clone repository
         if use_cloned_repo:
-            java_project_path = run_clone_step()
+            cloned_repo_path = run_clone_step()
         else:
-            java_project_path = settings.GIT_CLONE_TARGET
-            print(f"\n📁 Using existing path: {java_project_path}")
+            cloned_repo_path = settings.GIT_CLONE_TARGET
+            print(f"\n📁 Using existing path: {cloned_repo_path}")
 
-        # Step 2: Modernize code
-        stats = run_modernization(java_project_path, save_changes)
+        # Step 2: Collect files and generate payload
+        payload_file = run_file_collection(cloned_repo_path)
+
+        # Step 3: Process with StackSpot AI
+        stackspot_result = run_stackspot_processing(payload_file)
 
         # Final summary
         print("\n" + "✅ PROCESS COMPLETED".center(60, "="))
-        print(f"\n📊 Final Statistics:")
-        for key, value in stats.items():
-            print(f"   {key}: {value}")
-        print(f"\n📄 Report: {settings.REPORT_OUTPUT_PATH}")
-        print("\n" + "="*60)
+        print(f"\n📊 Results:")
+        print(f"   📁 Cloned repo: {cloned_repo_path}")
+        print(f"   📄 Payload file: {payload_file}")
+        print(f"   🔗 Execution ID: {stackspot_result['execution_id']}")
+        print(f"   ✅ Success: {stackspot_result['success']}")
+
+        if stackspot_result['result']:
+            print(f"   📝 Result length: {len(stackspot_result['result'])} chars")
+
+        print("\n" + "=" * 60)
 
         return 0
 
@@ -120,6 +178,7 @@ def main():
         import traceback
         traceback.print_exc()
         return 1
+
 
 if __name__ == '__main__':
     sys.exit(main())
