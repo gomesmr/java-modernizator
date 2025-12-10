@@ -1,8 +1,6 @@
 """
 Execution orchestrator
 """
-from typing import Optional
-
 from domain.entities import ExecutionResult, StepResult
 from domain.enums.execution_mode import ExecutionMode
 from application.steps import (
@@ -18,49 +16,18 @@ from config.settings import settings
 class ExecutionOrchestrator:
     """Orchestrates the execution flow"""
 
-    def __init__(self, mode: ExecutionMode, dev_execution_id: Optional[str] = None):
+    def __init__(self, mode: ExecutionMode):
         self.mode = mode
-        self.dev_execution_id = dev_execution_id
         self.result = ExecutionResult()
 
     def execute(self) -> ExecutionResult:
         """
-        Execute the complete flow based on mode
+        Execute the complete flow (always production)
 
         Returns:
             ExecutionResult with complete execution data
         """
-        if self.mode.is_dev:
-            return self._execute_dev_mode()
         return self._execute_prod_mode()
-
-    def _execute_dev_mode(self) -> ExecutionResult:
-        """Execute development mode (steps 4-5 only)"""
-        print("\n⚡ Development Mode: Skipping Steps 1-3")
-
-        # Step 4: Fetch callback
-        callback_step = CallbackStep()
-        callback_result = callback_step.execute(self.dev_execution_id)
-
-        if not callback_result.success:
-            self.result.success = False
-            self.result.error = callback_result.error
-            return self.result
-
-        self.result.execution_id = self.dev_execution_id
-        self.result.callback_file = callback_result.data['callback_file']
-
-        # Step 5: Process results
-        result_step = ResultStep()
-        processing_result = result_step.execute(callback_result.data['callback_file'])
-
-        if processing_result.success:
-            self.result.results_directory = processing_result.data['output_dir']
-            self.result.success = True
-        else:
-            self.result.error = processing_result.error
-
-        return self.result
 
     def _execute_prod_mode(self) -> ExecutionResult:
         """Execute production mode (all steps)"""

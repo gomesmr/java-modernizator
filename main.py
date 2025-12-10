@@ -4,13 +4,9 @@ Main entry point
 """
 import sys
 
-from domain.enums.execution_mode import ExecutionMode
 from application.validators.setup_validator import SetupValidator
 from application.orchestrator import ExecutionOrchestrator
-
-# 🚀 Configuration
-DEV_MODE = False
-DEV_EXECUTION_ID = "01KC3WJQRRMWVNDMH9W0S89JWW"
+from domain.enums.execution_mode import ExecutionMode
 
 
 def print_header() -> None:
@@ -19,20 +15,10 @@ def print_header() -> None:
     print("🎯 Hackathon Future Minds Edition\n")
 
 
-def print_mode_info(mode: ExecutionMode, execution_id: str = None) -> None:
-    """Print execution mode information"""
-    if mode.is_dev:
-        print("🚀 DEV MODE ENABLED - Skipping to Step 4".center(60, "🔧"))
-        print(f"🔗 Using Execution ID: {execution_id}")
-        print("=" * 60)
-
-
 def print_results(result, mode: ExecutionMode) -> None:
     """Print execution results"""
     status = "✅ COMPLETED" if result.success else "❌ FAILED"
-    mode_label = "DEV MODE" if mode.is_dev else "PROCESS"
-
-    print(f"\n{status} {mode_label}".center(60, "="))
+    print(f"\n{status} PROCESS".center(60, "="))
     print(f"\n📊 Results:")
 
     if result.execution_id:
@@ -63,22 +49,18 @@ def main() -> int:
     """
     print_header()
 
-    # Determine execution mode
-    mode = ExecutionMode.DEVELOPMENT if DEV_MODE else ExecutionMode.PRODUCTION
-    print_mode_info(mode, DEV_EXECUTION_ID if mode.is_dev else None)
+    # Always run in production mode
+    mode = ExecutionMode.PRODUCTION
 
     # Validate setup
-    validator = SetupValidator(dev_mode=mode.is_dev)
+    validator = SetupValidator()
     if not validator.validate():
         print(validator.get_errors())
         return 1
 
     try:
         # Execute orchestrated flow
-        orchestrator = ExecutionOrchestrator(
-            mode=mode,
-            dev_execution_id=DEV_EXECUTION_ID if mode.is_dev else None
-        )
+        orchestrator = ExecutionOrchestrator(mode=mode)
         result = orchestrator.execute()
 
         # Print results

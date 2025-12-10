@@ -10,8 +10,7 @@ from config.settings import settings
 class SetupValidator:
     """Validates application setup and requirements"""
 
-    def __init__(self, dev_mode: bool = False):
-        self.dev_mode = dev_mode
+    def __init__(self):
         self.errors: List[str] = []
 
     def validate(self) -> bool:
@@ -22,11 +21,8 @@ class SetupValidator:
             True if validation passes, False otherwise
         """
         self._validate_credentials()
-
-        if not self.dev_mode:
-            self._validate_git_token()
-            self._validate_paths_file()
-
+        self._validate_git_token()
+        self._validate_paths_file()
         return len(self.errors) == 0
 
     def _validate_credentials(self) -> None:
