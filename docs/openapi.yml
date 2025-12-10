@@ -1,0 +1,192 @@
+```yaml
+openapi: 3.0.0
+info:
+  title: API de Gerenciamento de Empresas
+  description: API para cadastro, consulta, atualização e remoção de empresas. Permite operações CRUD completas sobre entidades Empresa.
+  version: 1.0.0
+servers:
+  - url: http://api.example.dev.com/v1
+    description: Ambiente de dev
+  - url: http://api.example.hom.com/v1
+    description: Ambiente de homol
+  - url: http://api.example.prod.com/v1
+    description: Ambiente de Prod
+paths:
+  /empresas:
+    post:
+      summary: Criar uma nova empresa
+      description: Cadastra uma nova empresa na base de dados.
+      operationId: adicionarEmpresa
+      requestBody:
+        description: Payload para criação de uma nova empresa.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmpresaRequest'
+            example:
+              id: 1
+              nome: "Empresa Exemplo"
+              cnpj: "12.345.678/0001-99"
+      responses:
+        '201':
+          description: Empresa criada com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmpresaResponse'
+              example:
+                id: 1
+                nome: "Empresa Exemplo"
+                cnpj: "12.345.678/0001-99"
+        '400':
+          description: Erro de validação dos dados da empresa.
+        '409':
+          description: Empresa com CNPJ ou ID já cadastrado.
+    get:
+      summary: Listar todas as empresas
+      description: Retorna uma lista de todas as empresas cadastradas.
+      operationId: listarEmpresas
+      responses:
+        '200':
+          description: Lista de empresas cadastradas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EmpresaResponse'
+              example:
+                - id: 1
+                  nome: "Empresa Exemplo"
+                  cnpj: "12.345.678/0001-99"
+                - id: 2
+                  nome: "Outra Empresa"
+                  cnpj: "98.765.432/0001-11"
+  /empresas/{id}:
+    get:
+      summary: Buscar empresa por ID
+      description: Recupera informações detalhadas de uma empresa a partir de seu identificador.
+      operationId: buscarEmpresaPorId
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Identificador único da empresa.
+      responses:
+        '200':
+          description: Empresa encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmpresaResponse'
+              example:
+                id: 1
+                nome: "Empresa Exemplo"
+                cnpj: "12.345.678/0001-99"
+        '404':
+          description: Empresa não encontrada para o ID informado.
+    put:
+      summary: Atualizar empresa existente
+      description: Atualiza os dados de uma empresa existente pelo seu identificador.
+      operationId: atualizarEmpresa
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Identificador único da empresa.
+      requestBody:
+        description: Campos a serem atualizados da empresa.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmpresaUpdateRequest'
+            example:
+              nome: "Novo Nome"
+              cnpj: "98.765.432/0001-11"
+      responses:
+        '200':
+          description: Empresa atualizada com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmpresaResponse'
+              example:
+                id: 1
+                nome: "Novo Nome"
+                cnpj: "98.765.432/0001-11"
+        '400':
+          description: Erro de validação dos dados da empresa.
+        '404':
+          description: Empresa não encontrada para o ID informado.
+    delete:
+      summary: Remover empresa existente
+      description: Remove uma empresa a partir do identificador informado.
+      operationId: removerEmpresa
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Identificador único da empresa.
+      responses:
+        '204':
+          description: Empresa removida com sucesso.
+        '404':
+          description: Empresa não encontrada para o ID informado.
+components:
+  schemas:
+    EmpresaRequest:
+      type: object
+      required:
+        - id
+        - nome
+        - cnpj
+      properties:
+        id:
+          type: integer
+          example: 1
+          description: Identificador único da empresa.
+        nome:
+          type: string
+          example: "Empresa Exemplo"
+          description: Nome social da empresa.
+        cnpj:
+          type: string
+          example: "12.345.678/0001-99"
+          description: CNPJ da empresa no formato XX.XXX.XXX/0001-XX.
+    EmpresaUpdateRequest:
+      type: object
+      properties:
+        nome:
+          type: string
+          example: "Novo Nome"
+          description: Novo nome da empresa.
+        cnpj:
+          type: string
+          example: "98.765.432/0001-11"
+          description: Novo CNPJ da empresa.
+    EmpresaResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nome:
+          type: string
+          example: "Empresa Exemplo"
+        cnpj:
+          type: string
+          example: "12.345.678/0001-99"
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+```
