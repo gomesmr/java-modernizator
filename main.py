@@ -9,7 +9,7 @@ from application.validators.setup_validator import SetupValidator
 from application.orchestrator import ExecutionOrchestrator
 
 # 🚀 Configuration
-DEV_MODE = True
+DEV_MODE = False
 DEV_EXECUTION_ID = "01KC3WJQRRMWVNDMH9W0S89JWW"
 
 
