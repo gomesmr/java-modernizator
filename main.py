@@ -3,6 +3,7 @@
 Main entry point for Java Modernizator with Action orchestration
 """
 import sys
+import json
 from pathlib import Path
 from application.modernization_service import ModernizationService
 from application.report_generator import ReportGenerator
@@ -133,6 +134,53 @@ def run_stackspot_processing(payload_file: str) -> dict:
         raise
 
 
+def run_callback_fetch(execution_id: str) -> dict:
+    """
+    Execute callback fetch step
+
+    Args:
+        execution_id: Execution ID from StackSpot processing
+
+    Returns:
+        Callback results
+    """
+    print("\n" + "📞 STEP 4: Fetching Callback Result".center(60, "="))
+
+    try:
+        # Initialize StackSpot client
+        api_client = StackspotApiClient(str(settings.CREDENTIALS_PATH))
+
+        # Get callback result
+        callback_result = api_client.get_callback_result(execution_id)
+
+        if callback_result:
+            # Save callback result to file
+            callback_file = settings.PROJECT_ROOT / "assets" / "callback-result.json"
+            with open(callback_file, 'w', encoding='utf-8') as f:
+                json.dump(callback_result, f, indent=2, ensure_ascii=False)
+
+            print(f"💾 Callback result saved to: {callback_file}")
+
+            return {
+                'success': True,
+                'callback_result': callback_result,
+                'callback_file': str(callback_file)
+            }
+        else:
+            return {
+                'success': False,
+                'callback_result': None,
+                'message': 'Callback result not available'
+            }
+
+    except Exception as e:
+        print(f"❌ Failed to fetch callback: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
 def main():
     """Main execution function"""
     print("🎵 Modern Jazz - Java Modernizator".center(60, "="))
@@ -158,16 +206,25 @@ def main():
         # Step 3: Process with StackSpot AI
         stackspot_result = run_stackspot_processing(payload_file)
 
+        # Step 4: Fetch callback result
+        callback_result = run_callback_fetch(stackspot_result['execution_id'])
+
         # Final summary
         print("\n" + "✅ PROCESS COMPLETED".center(60, "="))
         print(f"\n📊 Results:")
         print(f"   📁 Cloned repo: {cloned_repo_path}")
         print(f"   📄 Payload file: {payload_file}")
         print(f"   🔗 Execution ID: {stackspot_result['execution_id']}")
-        print(f"   ✅ Success: {stackspot_result['success']}")
+        print(f"   ✅ Processing Success: {stackspot_result['success']}")
 
         if stackspot_result['result']:
-            print(f"   📝 Result length: {len(stackspot_result['result'])} chars")
+            print(f"   📝 Processing Result length: {len(stackspot_result['result'])} chars")
+
+        print(f"   📞 Callback Success: {callback_result['success']}")
+        if callback_result['success']:
+            print(f"   💾 Callback file: {callback_result['callback_file']}")
+        else:
+            print(f"   ⚠️ Callback issue: {callback_result.get('message', 'Unknown error')}")
 
         print("\n" + "=" * 60)
 

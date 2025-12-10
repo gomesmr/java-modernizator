@@ -2,6 +2,7 @@
 Client for Stackspot AI API
 """
 import json
+import requests
 from pathlib import Path
 from typing import Optional, Callable
 
@@ -14,6 +15,7 @@ class StackspotApiClient:
     def __init__(self, credentials_path: str):
         self.credentials = self._load_credentials(credentials_path)
         self.client = self._initialize_client()
+        self.access_token = None
 
     def _load_credentials(self, credentials_path: str) -> dict:
         """Load credentials from JSON file"""
@@ -35,7 +37,10 @@ class StackspotApiClient:
         """Initialize Stackspot SDK client"""
         try:
             from stackspot import Stackspot
-            return Stackspot(self.credentials)
+            client = Stackspot(self.credentials)
+            # Obter token de acesso para chamadas diretas à API
+            self._get_access_token()
+            return client
         except ImportError:
             raise StackspotApiError(
                 "Stackspot SDK not installed. Run: pip install stackspot-sdk"
@@ -44,6 +49,16 @@ class StackspotApiClient:
             raise StackspotApiError(
                 f"Failed to initialize Stackspot client: {e}"
             )
+
+    def _get_access_token(self):
+        """Get access token for direct API calls"""
+        try:
+            # Usar o SDK para obter o token
+            self.access_token = self.client.get_access_token()
+            print(f"✅ Access token obtained")
+        except Exception as e:
+            print(f"⚠️ Could not get access token: {e}")
+            self.access_token = None
 
     def execute_quick_command(
             self,
@@ -89,11 +104,67 @@ class StackspotApiClient:
                 f"Failed to poll execution result: {e}"
             )
 
+    def get_callback_result(self, execution_id: str) -> Optional[dict]:
+        """
+        Get callback result using direct API call
+
+        Args:
+            execution_id: The execution ID returned from execute_quick_command
+
+        Returns:
+            Dictionary with the callback result or None if not available
+        """
+        if not self.access_token:
+            print("⚠️ No access token available for callback API")
+            return None
+
+        try:
+            print(f"\n{'=' * 60}")
+            print(f"📞 Fetching Callback Result")
+            print(f"{'=' * 60}")
+            print(f"🔗 Execution ID: {execution_id}")
+
+            url = f"https://genai-code-buddy-api.stackspot.com/v1/quick-commands/callback/{execution_id}"
+
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'User-Agent': 'modern-jazz/1.0.0',
+                'Accept': 'application/json'
+            }
+
+            print(f"🌐 URL: {url}")
+
+            response = requests.get(url, headers=headers, timeout=30)
+
+            print(f"📊 Status Code: {response.status_code}")
+
+            if response.status_code == 200:
+                result = response.json()
+                print(f"✅ Callback result retrieved successfully")
+                print(f"📝 Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+                return result
+            elif response.status_code == 404:
+                print(f"⚠️ Callback not found (404) - may not be ready yet")
+                return None
+            else:
+                print(f"❌ API Error: {response.status_code}")
+                print(f"📄 Response: {response.text}")
+                return None
+
+        except requests.exceptions.Timeout:
+            print(f"⏰ Timeout while fetching callback")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"🌐 Network error: {e}")
+            return None
+        except Exception as e:
+            print(f"❌ Unexpected error: {e}")
+            return None
+
     def _default_callback(self, event: dict) -> None:
         """Default callback for status updates"""
         status = event.get('progress', {}).get('status', 'UNKNOWN')
         print(f"   Status: {status}")
-
 
     def _extract_result(self, execution: dict) -> Optional[str]:
         """Extract result from execution response"""
