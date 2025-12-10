@@ -10,7 +10,7 @@ from infrastructure.stackspot_client import StackspotApiClient
 class RefactoringStep:
 
     def __init__(self):
-        self.api_client = StackspotApiClient(str(settings.CREDENTIALS_PATH))
+        self.api_client_refactor = StackspotApiClient(str(settings.CREDENTIALS_PATH))
         self.quick_command_slug = "java-modern-jazz"
 
     def execute(self) -> StepResult:
@@ -85,14 +85,14 @@ class RefactoringStep:
                 plan_data
             )
 
-            execution_id = self.api_client.execute_quick_command(
+            execution_id = self.api_client_refactor.execute_quick_command(
                 command_slug=self.quick_command_slug,
                 input_content=input_data
             )
 
             print(f"  Execution created: {execution_id}")
 
-            result = self.api_client.poll_execution_result(execution_id)
+            result = self.api_client_refactor.poll_execution_result(execution_id)
 
             refactored_content = json.loads(result).get('result', '') if isinstance(result, str) else result.get(
                 'result', '')

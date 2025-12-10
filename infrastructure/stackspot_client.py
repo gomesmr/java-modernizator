@@ -94,8 +94,6 @@ class StackspotApiClient:
             timeout: int = 600,
             status_callback: Optional[Callable] = None
     ) -> dict:
-        """Poll for execution result with enhanced error handling and timeout"""
-        logger = logging.getLogger(__name__)
 
         if not self.client or not hasattr(self.client, 'ai'):
             raise StackspotApiError("StackSpot client not properly initialized")
@@ -105,7 +103,6 @@ class StackspotApiClient:
         last_status = None
 
         try:
-            logger.info(f"Polling execution {execution_id}...")
             print(f"🔗 Tracking execution: /executions/{execution_id}")
 
             while (time.time() - start_time) < timeout:
@@ -118,7 +115,6 @@ class StackspotApiClient:
 
                 # Status change logging
                 if current_status != last_status:
-                    logger.debug(f"Status changed to {current_status}")
                     last_status = current_status
 
                 # Handle completion
@@ -126,7 +122,6 @@ class StackspotApiClient:
                     if 'result' not in execution:
                         raise StackspotApiError("Completed execution missing result field")
 
-                    logger.info(f"Execution completed in {attempts} attempts")
                     return self._parse_execution_result(execution)
 
                 # Handle terminal states
@@ -143,13 +138,10 @@ class StackspotApiClient:
             raise RQCExecutionTimeoutError(f"Timeout after {timeout} seconds")
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"API request failed: {str(e)}")
             raise StackspotApiError(f"Network error: {str(e)}")
         except json.JSONDecodeError as e:
-            logger.error("Invalid JSON response")
             raise StackspotApiError("Failed to parse API response")
         except Exception as e:
-            logger.error(f"Unexpected error: {str(e)}")
             raise
 
     def _parse_execution_result(self, execution: dict) -> dict:

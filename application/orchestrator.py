@@ -32,33 +32,31 @@ class ExecutionOrchestrator:
     def _execute_prod_mode(self) -> ExecutionResult:
         """Execute production mode (all steps)"""
         # Step 1: Clone repository
-        # clone_result = self._execute_clone_step()
-        # if not clone_result.success:
-        #     return self.result
-        #
-        # # Step 2: Collect files
-        # collection_result = self._execute_collection_step(clone_result.data)
-        # if not collection_result.success:
-        #     return self.result
-        #
-        # # Step 3: Process with StackSpot (Analysis)
-        # processing_result = self._execute_processing_step(collection_result.data)
-        # if not processing_result.success:
-        #     return self.result
-        #
-        # # Step 4: Fetch callback (Analysis)
-        # callback_result = self._execute_callback_step(
-        #     processing_result.data['execution_id']
-        # )
-        # if not callback_result.success:
-        #     return self.result
-        #
-        # # Step 5: Process results (Analysis)
-        # result_step_result = self._execute_result_step(
-        #     callback_result.data['callback_file']
-        # )
-        # if not result_step_result.success:
-        #     return self.result
+        clone_result = self._execute_clone_step()
+        if not clone_result.success:
+            return self.result
+
+        # Step 2: Collect files
+        collection_result = self._execute_collection_step(clone_result.data)
+        if not collection_result.success:
+            return self.result
+
+        # Step 3: Process with StackSpot (Analysis)
+        processing_result = self._execute_processing_step(collection_result.data)
+        if not processing_result.success:
+            return self.result
+
+        # Step 4: Fetch callback (Analysis)
+        callback_result = self._execute_callback_step("01KC4KZ9J1JF784CVHNS7E9Z9H")
+        if not callback_result.success:
+            return self.result
+
+        # Step 5: Process results (Analysis)
+        result_step_result = self._execute_result_step(
+            callback_result.data['callback_file']
+        )
+        if not result_step_result.success:
+            return self.result
 
         # Step 6: Execute Refactoring
         refactoring_result = self._execute_refactoring_step()
