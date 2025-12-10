@@ -1,98 +1,125 @@
+# main.py
 """
-Main entry point for Java Modernizator
+Main entry point for Java Modernizator with Action orchestration
 """
 import sys
 from pathlib import Path
-
 from application.modernization_service import ModernizationService
 from application.report_generator import ReportGenerator
 from config.settings import settings
 from infrastructure.file_system import JavaFileRepository
 from infrastructure.stackspot_client import StackspotApiClient
-
+from infrastructure.stackspot_action_runner import StackspotActionRunner
 
 def validate_setup() -> None:
     """Validate that all required files and directories exist"""
     errors = []
 
-    # Check credentials file
     if not settings.CREDENTIALS_PATH.exists():
         errors.append(
             f"❌ Credentials file not found: {settings.CREDENTIALS_PATH}\n"
-            f"   Create it from: {settings.PROJECT_ROOT / 'secrets-example.json'}\n"
-            f"   Command: copy secrets-example.json secrets.json"
+            f"   Create it from: {settings.PROJECT_ROOT / 'secrets-example.json'}"
         )
+
+    # Validate git_token exists in credentials
+    try:
+        git_token = settings.get_git_token()
+        if not git_token:
+            errors.append(
+                f"❌ Git token not found in credentials file\n"
+                f"   Add 'git_token' to: {settings.CREDENTIALS_PATH}"
+            )
+    except Exception as e:
+        errors.append(f"❌ Error loading credentials: {e}")
 
     if errors:
         print("\n" + "\n\n".join(errors))
-        print("\n💡 Setup Instructions:")
-        print("   1. Copy secrets-example.json to secrets.json")
-        print("   2. Fill in your Stackspot credentials")
-        print("   3. Run the script again")
         sys.exit(1)
 
+def run_clone_step() -> str:
+    """
+    Execute clone repository action
 
-def print_configuration(java_project_path: str) -> None:
-    """Print current configuration"""
-    print("📋 Configuration:")
-    print(f"   Project Root: {settings.PROJECT_ROOT}")
-    print(f"   Credentials: {settings.CREDENTIALS_PATH}")
-    print(f"   Report Output: {settings.REPORT_OUTPUT_PATH}")
-    print(f"   Java Project: {java_project_path}")
-    print(f"   Credentials Exists: {settings.CREDENTIALS_PATH.exists()}")
-    print()
+    Returns:
+        Path to cloned repository
+    """
+    print("\n" + "🔄 STEP 1: Cloning Repository".center(60, "="))
 
+    try:
+        action_runner = StackspotActionRunner(wsl_enabled=False)
+        repo_path = action_runner.clone_repository()
+        return repo_path
+
+    except Exception as e:
+        print(f"❌ Failed to clone repository: {e}")
+        raise
+
+def run_modernization(java_project_path: str, save_changes: bool = True) -> dict:
+    """
+    Execute modernization process
+
+    Args:
+        java_project_path: Path to Java project
+        save_changes: Whether to save changes
+
+    Returns:
+        Statistics dictionary
+    """
+    print("\n" + "🔧 STEP 2: Modernizing Code".center(60, "="))
+
+    # Initialize components
+    file_repository = JavaFileRepository(java_project_path)
+    api_client = StackspotApiClient(str(settings.CREDENTIALS_PATH))
+    service = ModernizationService(file_repository, api_client)
+
+    # Execute modernization
+    stats = service.modernize_all_files(save_changes=save_changes)
+
+    # Generate report
+    print("\n📝 Generating report...")
+    report_generator = ReportGenerator(service.get_results())
+    report_generator.generate_json_report(str(settings.REPORT_OUTPUT_PATH))
+
+    return stats
 
 def main():
     """Main execution function"""
-    print("🚀 Java Modernizator - Starting...\n")
+    print("🎵 Modern Jazz - Java Modernizator".center(60, "="))
+    print("🎯 Hackathon Future Minds Edition\n")
 
     # Validate setup
     validate_setup()
 
     # Configuration
-    java_project_path = r"C:\Users\marcelo.gomes\gomesmr\Hackathon\hackathon\src\main"
-    save_changes = True  # Set to False for dry-run
-
-    # Print configuration
-    print_configuration(java_project_path)
+    save_changes = True
+    use_cloned_repo = True  # Set to False to skip cloning
 
     try:
-        # Initialize components
-        print("🔧 Initializing components...")
-        file_repository = JavaFileRepository(java_project_path)
-        api_client = StackspotApiClient(str(settings.CREDENTIALS_PATH))
+        # Step 1: Clone repository
+        if use_cloned_repo:
+            java_project_path = run_clone_step()
+        else:
+            java_project_path = settings.GIT_CLONE_TARGET
+            print(f"\n📁 Using existing path: {java_project_path}")
 
-        # Create service
-        service = ModernizationService(file_repository, api_client)
+        # Step 2: Modernize code
+        stats = run_modernization(java_project_path, save_changes)
 
-        # Execute modernization
-        print("🚀 Starting modernization process...\n")
-        stats = service.modernize_all_files(save_changes=save_changes)
-
-        # Generate report
-        print("\n📝 Generating report...")
-        report_generator = ReportGenerator(service.get_results())
-        report_generator.generate_json_report(
-            str(settings.REPORT_OUTPUT_PATH)
-        )
-
-        print("\n✅ Process completed successfully!")
+        # Final summary
+        print("\n" + "✅ PROCESS COMPLETED".center(60, "="))
         print(f"\n📊 Final Statistics:")
         for key, value in stats.items():
             print(f"   {key}: {value}")
+        print(f"\n📄 Report: {settings.REPORT_OUTPUT_PATH}")
+        print("\n" + "="*60)
 
         return 0
 
-    except FileNotFoundError as e:
-        print(f"\n❌ File not found: {e}")
-        return 1
     except Exception as e:
         print(f"\n❌ Fatal error: {e}")
         import traceback
         traceback.print_exc()
         return 1
-
 
 if __name__ == '__main__':
     sys.exit(main())
