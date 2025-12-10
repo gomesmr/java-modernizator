@@ -1,3 +1,4 @@
+# application/orchestrator.py
 """
 Execution orchestrator
 """
@@ -8,10 +9,9 @@ from application.steps import (
     CollectionStep,
     ProcessingStep,
     CallbackStep,
-    ResultStep
+    ResultStep,
+    RefactoringStep
 )
-from config.settings import settings
-
 
 class ExecutionOrchestrator:
     """Orchestrates the execution flow"""
@@ -32,36 +32,40 @@ class ExecutionOrchestrator:
     def _execute_prod_mode(self) -> ExecutionResult:
         """Execute production mode (all steps)"""
         # Step 1: Clone repository
-        clone_result = self._execute_clone_step()
-        if not clone_result.success:
+        # clone_result = self._execute_clone_step()
+        # if not clone_result.success:
+        #     return self.result
+        #
+        # # Step 2: Collect files
+        # collection_result = self._execute_collection_step(clone_result.data)
+        # if not collection_result.success:
+        #     return self.result
+        #
+        # # Step 3: Process with StackSpot (Analysis)
+        # processing_result = self._execute_processing_step(collection_result.data)
+        # if not processing_result.success:
+        #     return self.result
+        #
+        # # Step 4: Fetch callback (Analysis)
+        # callback_result = self._execute_callback_step(
+        #     processing_result.data['execution_id']
+        # )
+        # if not callback_result.success:
+        #     return self.result
+        #
+        # # Step 5: Process results (Analysis)
+        # result_step_result = self._execute_result_step(
+        #     callback_result.data['callback_file']
+        # )
+        # if not result_step_result.success:
+        #     return self.result
+
+        # Step 6: Execute Refactoring
+        refactoring_result = self._execute_refactoring_step()
+        if not refactoring_result.success:
             return self.result
 
-        # Step 2: Collect files
-        collection_result = self._execute_collection_step(clone_result.data)
-        if not collection_result.success:
-            return self.result
-
-        # Step 3: Process with StackSpot
-        processing_result = self._execute_processing_step(collection_result.data)
-        if not processing_result.success:
-            return self.result
-
-        # Step 4: Fetch callback
-        callback_result = self._execute_callback_step(
-            processing_result.data['execution_id']
-        )
-        if not callback_result.success:
-            return self.result
-
-        # Step 5: Process results
-        result_step_result = self._execute_result_step(
-            callback_result.data['callback_file']
-        )
-
-        self.result.success = result_step_result.success
-        if not result_step_result.success:
-            self.result.error = result_step_result.error
-
+        self.result.success = True
         return self.result
 
     def _execute_clone_step(self) -> StepResult:
@@ -123,6 +127,19 @@ class ExecutionOrchestrator:
 
         if result.success:
             self.result.results_directory = result.data['output_dir']
+        else:
+            self.result.success = False
+            self.result.error = result.error
+
+        return result
+
+    def _execute_refactoring_step(self) -> StepResult:
+        """Execute refactoring step"""
+        refactoring_step = RefactoringStep()
+        result = refactoring_step.execute()
+
+        if result.success:
+            self.result.refactored_files = result.data.get('refactored_files', [])
         else:
             self.result.success = False
             self.result.error = result.error

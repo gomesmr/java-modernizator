@@ -2,7 +2,7 @@
 Domain entities for Java modernization
 """
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 
 
 @dataclass(frozen=True)
@@ -62,13 +62,14 @@ class StepResult:
 
 @dataclass
 class ExecutionResult:
-    """Complete execution result"""
-    execution_id: Optional[str] = None
+    """Execution result entity"""
+    success: bool = False
     cloned_repo_path: Optional[str] = None
     payload_file: Optional[str] = None
+    execution_id: Optional[str] = None
     callback_file: Optional[str] = None
     results_directory: Optional[str] = None
-    success: bool = False
+    refactored_files: Optional[List[Dict[str, Any]]] = None
     error: Optional[str] = None
 
     def add_step_result(self, step_name: str, result: StepResult) -> None:

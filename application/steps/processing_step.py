@@ -25,10 +25,8 @@ class ProcessingStep:
         print("\n" + "🤖 STEP 3: Processing with StackSpot AI".center(60, "="))
 
         try:
-            # Read payload content
             payload_content = self._read_payload(payload_file)
 
-            # Execute quick command
             print(f"🚀 Executing quick command: {settings.QUICK_COMMAND_SLUG}")
             execution_id = self.api_client.execute_quick_command(
                 settings.QUICK_COMMAND_SLUG,

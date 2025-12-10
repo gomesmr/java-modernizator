@@ -26,3 +26,7 @@ class StackspotApiError(ModernizationError):
 class FileProcessingError(ModernizationError):
     """Raised when file processing fails"""
     pass
+
+class RQCExecutionTimeoutError(ModernizationError):
+    """Raised when file processing fails"""
+    pass

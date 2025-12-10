@@ -3,11 +3,14 @@
 Client for Stackspot AI API
 """
 import json
+import logging
+import time
+
 import requests
 from pathlib import Path
 from typing import Optional, Callable
 
-from domain.exceptions import CredentialsNotFoundError, StackspotApiError
+from domain.exceptions import CredentialsNotFoundError, StackspotApiError, RQCExecutionTimeoutError
 
 
 class StackspotApiClient:
@@ -87,32 +90,83 @@ class StackspotApiClient:
     def poll_execution_result(
             self,
             execution_id: str,
-            polling_delay: int = 23,
+            polling_delay: int = 5,
+            timeout: int = 600,
             status_callback: Optional[Callable] = None
-    ) -> Optional[str]:
-        """Poll for execution result"""
-        if not self.client:
-            raise StackspotApiError("StackSpot client not available")
+    ) -> dict:
+        """Poll for execution result with enhanced error handling and timeout"""
+        logger = logging.getLogger(__name__)
+
+        if not self.client or not hasattr(self.client, 'ai'):
+            raise StackspotApiError("StackSpot client not properly initialized")
+
+        start_time = time.time()
+        attempts = 0
+        last_status = None
 
         try:
-            print(f"   🔗 Execution ID: {execution_id}")
+            logger.info(f"Polling execution {execution_id}...")
+            print(f"🔗 Tracking execution: /executions/{execution_id}")
 
-            config = {
-                'delay': polling_delay,
-                'on_callback_response': status_callback or self._default_callback
-            }
+            while (time.time() - start_time) < timeout:
+                attempts += 1
 
-            execution = self.client.ai.quick_command.poll_execution(
-                execution_id,
-                config
-            )
 
-            return self._extract_result(execution)
 
+                execution = self.client.ai.quick_command.get_execution(execution_id)
+                current_status = execution.get('status')
+
+                # Status change logging
+                if current_status != last_status:
+                    logger.debug(f"Status changed to {current_status}")
+                    last_status = current_status
+
+                # Handle completion
+                if current_status == 'COMPLETED':
+                    if 'result' not in execution:
+                        raise StackspotApiError("Completed execution missing result field")
+
+                    logger.info(f"Execution completed in {attempts} attempts")
+                    return self._parse_execution_result(execution)
+
+                # Handle terminal states
+                if current_status in ['FAILED', 'CANCELLED']:
+                    error_msg = execution.get('error', 'Unknown error')
+                    raise StackspotApiError(f"Execution {current_status}: {error_msg}")
+
+                # Execute callback and wait
+                if status_callback:
+                    status_callback(execution)
+
+                time.sleep(polling_delay)
+
+            raise RQCExecutionTimeoutError(f"Timeout after {timeout} seconds")
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"API request failed: {str(e)}")
+            raise StackspotApiError(f"Network error: {str(e)}")
+        except json.JSONDecodeError as e:
+            logger.error("Invalid JSON response")
+            raise StackspotApiError("Failed to parse API response")
         except Exception as e:
-            raise StackspotApiError(
-                f"Failed to poll execution result: {e}"
-            )
+            logger.error(f"Unexpected error: {str(e)}")
+            raise
+
+    def _parse_execution_result(self, execution: dict) -> dict:
+        """Validate and parse execution result"""
+        try:
+            result = execution['result']
+
+            if isinstance(result, str):
+                result = json.loads(result)
+
+            if not isinstance(result, dict):
+                raise ValueError("Unexpected result format")
+
+            return result
+
+        except (KeyError, json.JSONDecodeError, ValueError) as e:
+            raise StackspotApiError(f"Invalid result format: {str(e)}")
 
     def get_callback_result(self, execution_id: str) -> Optional[dict]:
         """
