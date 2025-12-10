@@ -1,0 +1,4 @@
+/mnt/c/Users/marcelo.gomes/gomesmr/Hackathon/hackathon/src/test/java/com/legacy/AppConfigTest.java
+/mnt/c/Users/marcelo.gomes/gomesmr/Hackathon/hackathon/src/test/java/com/legacy/EmpresaDAOTest.java
+/mnt/c/Users/marcelo.gomes/gomesmr/Hackathon/hackathon/src/test/java/com/legacy/EmpresaServiceTest.java
+/mnt/c/Users/marcelo.gomes/gomesmr/Hackathon/hackathon/src/test/java/com/legacy/EmpresaTest.java
