@@ -70,6 +70,8 @@ class StackspotApiClient:
     ) -> Optional[str]:
         """Poll for execution result"""
         try:
+            print(f"   🔗 Execution ID: {execution_id}")
+
             config = {
                 'delay': polling_delay,
                 'on_callback_response': status_callback or self._default_callback
@@ -81,6 +83,7 @@ class StackspotApiClient:
             )
 
             return self._extract_result(execution)
+
         except Exception as e:
             raise StackspotApiError(
                 f"Failed to poll execution result: {e}"
@@ -90,6 +93,7 @@ class StackspotApiClient:
         """Default callback for status updates"""
         status = event.get('progress', {}).get('status', 'UNKNOWN')
         print(f"   Status: {status}")
+
 
     def _extract_result(self, execution: dict) -> Optional[str]:
         """Extract result from execution response"""
