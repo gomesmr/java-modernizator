@@ -1,4 +1,42 @@
+# Secrets
 /secrets.json
-/.idea/*
 
+# IDE
+/.idea/*
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Reports
+/modernization_report.json
+
+# Assets
 /assets/main-payload.md
+
+# OS
+.DS_Store
+Thumbs.db
