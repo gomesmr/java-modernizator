@@ -1,3 +1,4 @@
+# infrastructure/stackspot_client.py
 """
 Client for Stackspot AI API
 """
@@ -14,8 +15,9 @@ class StackspotApiClient:
 
     def __init__(self, credentials_path: str):
         self.credentials = self._load_credentials(credentials_path)
-        self.client = self._initialize_client()
+        self.client = None
         self.access_token = None
+        self._initialize_client()
 
     def _load_credentials(self, credentials_path: str) -> dict:
         """Load credentials from JSON file"""
@@ -37,21 +39,23 @@ class StackspotApiClient:
         """Initialize Stackspot SDK client"""
         try:
             from stackspot import Stackspot
-            client = Stackspot(self.credentials)
+            self.client = Stackspot(self.credentials)
             # Obter token de acesso para chamadas diretas à API
             self._get_access_token()
-            return client
+            print(f"✅ StackSpot client initialized successfully")
         except ImportError:
-            raise StackspotApiError(
-                "Stackspot SDK not installed. Run: pip install stackspot-sdk"
-            )
+            print("⚠️ Stackspot SDK not installed, using direct API calls only")
+            self.client = None
         except Exception as e:
-            raise StackspotApiError(
-                f"Failed to initialize Stackspot client: {e}"
-            )
+            print(f"⚠️ Failed to initialize Stackspot client: {e}")
+            self.client = None
 
     def _get_access_token(self):
         """Get access token for direct API calls"""
+        if not self.client:
+            print("⚠️ No StackSpot client available for token generation")
+            return
+
         try:
             # Usar o SDK para obter o token
             self.access_token = self.client.get_access_token()
@@ -66,6 +70,9 @@ class StackspotApiClient:
             input_content: str
     ) -> str:
         """Execute a quick command and return execution ID"""
+        if not self.client:
+            raise StackspotApiError("StackSpot client not available")
+
         try:
             execution_id = self.client.ai.quick_command.create_execution(
                 command_slug,
@@ -84,6 +91,9 @@ class StackspotApiClient:
             status_callback: Optional[Callable] = None
     ) -> Optional[str]:
         """Poll for execution result"""
+        if not self.client:
+            raise StackspotApiError("StackSpot client not available")
+
         try:
             print(f"   🔗 Execution ID: {execution_id}")
 
@@ -114,9 +124,20 @@ class StackspotApiClient:
         Returns:
             Dictionary with the callback result or None if not available
         """
+        # Tentar obter token se não tiver
+        if not self.access_token and self.client:
+            self._get_access_token()
+
         if not self.access_token:
             print("⚠️ No access token available for callback API")
-            return None
+            print("💡 Trying to get token using credentials directly...")
+
+            # Fallback: tentar obter token diretamente
+            token = self._get_token_direct()
+            if token:
+                self.access_token = token
+            else:
+                return None
 
         try:
             print(f"\n{'=' * 60}")
@@ -159,6 +180,33 @@ class StackspotApiClient:
             return None
         except Exception as e:
             print(f"❌ Unexpected error: {e}")
+            return None
+
+    def _get_token_direct(self) -> Optional[str]:
+        """Get token using direct API call as fallback"""
+        try:
+            # URL para obter token (pode variar conforme a API da StackSpot)
+            auth_url = "https://idm.stackspot.com/zup/oidc/oauth/token"
+
+            data = {
+                'client_id': self.credentials.get('client_id'),
+                'client_secret': self.credentials.get('client_secret'),
+                'grant_type': 'client_credentials'
+            }
+
+            response = requests.post(auth_url, data=data, timeout=30)
+
+            if response.status_code == 200:
+                token_data = response.json()
+                token = token_data.get('access_token')
+                print(f"✅ Token obtained via direct API call")
+                return token
+            else:
+                print(f"❌ Failed to get token: {response.status_code}")
+                return None
+
+        except Exception as e:
+            print(f"❌ Error getting token directly: {e}")
             return None
 
     def _default_callback(self, event: dict) -> None:
