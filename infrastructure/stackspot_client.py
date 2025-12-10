@@ -3,7 +3,6 @@
 Client for Stackspot AI API
 """
 import json
-import logging
 import time
 
 import requests
@@ -61,7 +60,7 @@ class StackspotApiClient:
 
         try:
             # Usar o SDK para obter o token
-            self.access_token = self.client.get_access_token()
+            self.access_token = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ijk5YWRmYmI4LWU3ZTEtNDlmNi1iNmFhLTJlYWVlZTYyZDk4ZiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50X2lkX3YyIjoiMDFHUlZYTU5WMVAwMjgxTkdXQlg3MUQ3NTIiLCJhY2NvdW50X25hbWUiOiJadXAgSVQgSW5ub3ZhdGlvbiIsImFjY291bnRfc2x1ZyI6Inp1cCIsImFjY291bnRfdHlwZSI6IkVOVEVSUFJJU0UiLCJhdHRyaWJ1dGVzIjp7fSwiYXVkIjpbImM1NDM0MjBmLTk1N2MtNDYwOS1iZTAzLWJmZWM1NDIyZTM4ZCJdLCJhenAiOiIzOTczNGZlMi1mYjEzLTQzMGQtYTJmOC0wMjFjZjI0YjlhZWIiLCJjbGllbnRJZCI6ImM1NDM0MjBmLTk1N2MtNDYwOS1iZTAzLWJmZWM1NDIyZTM4ZCIsImNsaWVudF9pZCI6ImM1NDM0MjBmLTk1N2MtNDYwOS1iZTAzLWJmZWM1NDIyZTM4ZCIsImVtYWlsIjoibWFyY2Vsby5nb21lc0B6dXAuY29tLmJyIiwiZXhwIjoxNzY1Mzk1Nzg3LCJmYW1pbHlfbmFtZSI6IlJlbmF0byBHb21lcyIsImdpdmVuX25hbWUiOiJNYXJjZWxvIiwiaWF0IjoxNzY1Mzk0NTg3LCJpc3MiOiJodHRwczovL2F1dGguc3RhY2tzcG90LmNvbS96dXAvb2lkYyIsImp0aSI6ImlvSXEzNFJxQ3BzZWI2UTJIRTJtc0RDU1JPb1FsTWpXakY4QXdFVmI2UDBnWUthb3pzbTI4VDhadmpmSzZmSEoiLCJuYW1lIjoiTWFyY2VsbyBSZW5hdG8gR29tZXMiLCJuYmYiOjE3NjUzOTQ1ODcsInByZWZlcnJlZF91c2VybmFtZSI6Im1hcmNlbG8uZ29tZXMiLCJyZWFsbSI6Inp1cCIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIiwiZGVmYXVsdCB1c2VyIHJvbGU6IDBlNWY5NmEwLWU4YzQtNDhhOS05MzVmLTNjNDNlZWZlMTc3YiIsImNvZGVfc2hpZnRfZGV2ZWxvcGVyIiwiYWlfZGV2ZWxvcGVyIiwibWVtYmVyIiwiZGV2ZWxvcGVyIiwiY3JlYXRvciIsIjAxR1JWWE1OVjFQMDI4MU5HV0JYNzFENzUyIiwiZGVmYXVsdCBncm91cCByb2xlOiAwY2QxNTYyYS0wMmQwLTRkMGEtOGNmYy1hNDM4N2Q3ODQxZmEiXX0sInJvbGVzIjpbIm9mZmxpbmVfYWNjZXNzIiwidW1hX2F1dGhvcml6YXRpb24iLCJkZWZhdWx0IHVzZXIgcm9sZTogMGU1Zjk2YTAtZThjNC00OGE5LTkzNWYtM2M0M2VlZmUxNzdiIiwiY29kZV9zaGlmdF9kZXZlbG9wZXIiLCJhaV9kZXZlbG9wZXIiLCJtZW1iZXIiLCJkZXZlbG9wZXIiLCJjcmVhdG9yIiwiMDFHUlZYTU5WMVAwMjgxTkdXQlg3MUQ3NTIiLCJkZWZhdWx0IGdyb3VwIHJvbGU6IDBjZDE1NjJhLTAyZDAtNGQwYS04Y2ZjLWE0Mzg3ZDc4NDFmYSJdLCJzY29wZSI6ImF0dHJpYnV0ZXMgcm9sZXMgZW1haWwiLCJzdWIiOiJjNTQzNDIwZi05NTdjLTQ2MDktYmUwMy1iZmVjNTQyMmUzOGQiLCJ0ZW5hbnQiOiJ6dXAiLCJ0ZW5hbnRfaWQiOiIzOTczNGZlMi1mYjEzLTQzMGQtYTJmOC0wMjFjZjI0YjlhZWIiLCJ0b2tlblR5cGUiOiJDTElFTlRfU0VSVklDRV9BQ0NPVU5UIiwidG9rZW5fdHlwZSI6IkNMSUVOVF9QRVJTT05BTCIsInVzZXJfaWQiOiIwZTVmOTZhMC1lOGM0LTQ4YTktOTM1Zi0zYzQzZWVmZTE3N2IiLCJ1c2VybmFtZSI6Im1hcmNlbG8uZ29tZXMifQ.Ty_bAw9xNBgtur-YSzICNxM0PB7UWyvirDCFoVXMu-YNl7Mj70kSX3fpVZSD0-x3iPvruPpdFZ_hzXVsJTgf6wkCc5rUkS8T8KFiXtjcOhclfek93-OdRQJnbeMB-GgeH9wsvZ-OqIDpt-q1AcQ1iPQsvgD01zXyQ6OE86sl0EBM7DFRPGa7rFaD4jqeIiuy9rS4YIMRBoJL5q_WIePIBWCsMk1lVvfGK6INRiAfjdP9ywveKOGgsXmwVuCqOKI3pZun_kFFN0jMsI3PVDosznh6kXb2AY_tTCSgcQYVUZV3OiZJWLrtW4RBEgUo6hBnHMLUQY2MnO1EMKMztNhutILOUA9_km37P1G9W0TObbINo2egUA6B1Z_xMjnl_CHt-0_kPJqH6zuGEZzh0hjlL0g4MzQ22Pl8UkpOKeJ8MtwUkI8SRIsnl-xhZTtK2ASmhQwcCxFXy9RMxrR6tdajS6mxvxRAHDrOmepqgL3_oTIkPE7CFh-VsVHnKJ0xuIoZWjffxeF8NhEFSwrTEmqVvTuVO8nAbJeK8lq5j5KJ0z55p5jw07EIbCTgrj4bXDsXRBDVk9eJYc-YeShaGbjPckQDKbrbl5jE38gMDHmoc1SrLR1Nfjyc1zQXHJbmCLAZJU5_XssLwTiZ4bNKYHHN7HiU-QCnajEpSwqbBKfv6Dg"
             print(f"✅ Access token obtained")
         except Exception as e:
             print(f"⚠️ Could not get access token: {e}")
@@ -94,55 +93,68 @@ class StackspotApiClient:
             timeout: int = 600,
             status_callback: Optional[Callable] = None
     ) -> dict:
+        """Poll for execution result using direct API calls"""
 
-        if not self.client or not hasattr(self.client, 'ai'):
-            raise StackspotApiError("StackSpot client not properly initialized")
+        # Garantir que temos token de acesso
+        if not self.access_token:
+            self._get_access_token()
+
+        if not self.access_token:
+            raise StackspotApiError("No access token available")
 
         start_time = time.time()
         attempts = 0
-        last_status = None
 
-        try:
-            print(f"🔗 Tracking execution: /executions/{execution_id}")
+        # URL da API para polling
+        api_url = f"https://genai-code-buddy-api.stackspot.com/v1/quick-commands/callback/{execution_id}"
 
-            while (time.time() - start_time) < timeout:
-                attempts += 1
+        headers = {
+            'Authorization': f'Bearer {self.access_token}',
+            'Accept': 'application/json',
+            'User-Agent': 'modern-jazz/1.0.0'
+        }
 
+        print(f"🔗 Polling execution: {execution_id}")
 
+        while (time.time() - start_time) < timeout:
+            attempts += 1
 
-                execution = self.client.ai.quick_command.get_execution(execution_id)
-                current_status = execution.get('status')
+            try:
+                response = requests.get(api_url, headers=headers, timeout=30)
 
-                # Status change logging
-                if current_status != last_status:
-                    last_status = current_status
+                if response.status_code == 200:
+                    result = response.json()
 
-                # Handle completion
-                if current_status == 'COMPLETED':
-                    if 'result' not in execution:
-                        raise StackspotApiError("Completed execution missing result field")
+                    # Verificar se a execução foi completada
+                    progress = result.get('progress', {})
+                    status = progress.get('status')
 
-                    return self._parse_execution_result(execution)
+                    print(f"📊 Attempt {attempts}: {status}")
 
-                # Handle terminal states
-                if current_status in ['FAILED', 'CANCELLED']:
-                    error_msg = execution.get('error', 'Unknown error')
-                    raise StackspotApiError(f"Execution {current_status}: {error_msg}")
+                    if status == 'COMPLETED':
+                        print(f"✅ Execution completed in {attempts} attempts")
+                        return result
 
-                # Execute callback and wait
-                if status_callback:
-                    status_callback(execution)
+                    elif status in ['FAILED', 'CANCELLED']:
+                        error = result.get('error', 'Unknown error')
+                        raise StackspotApiError(f"Execution {status}: {error}")
 
-                time.sleep(polling_delay)
+                    # Executar callback se fornecido
+                    if status_callback:
+                        status_callback(result)
 
-            raise RQCExecutionTimeoutError(f"Timeout after {timeout} seconds")
+                elif response.status_code == 404:
+                    print(f"⏳ Execution not ready yet (attempt {attempts})")
 
-        except requests.exceptions.RequestException as e:
-            raise StackspotApiError(f"Network error: {str(e)}")
-        except json.JSONDecodeError as e:
-            raise StackspotApiError("Failed to parse API response")
-        except Exception as e:
-            raise
+                else:
+                    print(f"⚠️ API returned {response.status_code}: {response.text}")
+
+            except requests.exceptions.RequestException as e:
+                print(f"🌐 Network error on attempt {attempts}: {e}")
+
+            time.sleep(polling_delay)
+
+        raise RQCExecutionTimeoutError(f"Timeout after {timeout} seconds and {attempts} attempts")
 
     def _parse_execution_result(self, execution: dict) -> dict:
         """Validate and parse execution result"""
